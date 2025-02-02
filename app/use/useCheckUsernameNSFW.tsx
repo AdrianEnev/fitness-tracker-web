@@ -1,49 +1,68 @@
-const apiToken = process.env.REACT_APP_HUGGINGFACE_API_TOKEN;
+const apiToken = import.meta.env.VITE_REACT_APP_HUGGINGFACE_API_TOKEN;
 
 const checkUsernameNSFW = async (username: string) => {
+    console.log(apiToken);
+    console.log("checking if username is nsfw");
 
-    const response = await fetch("https://api-inference.huggingface.co/models/facebook/bart-large-mnli", {
-        method: "POST",
-        headers: {
-            "Authorization": `Bearer ${apiToken}`,
-            "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ 
-            inputs: username,
-            parameters: {
-                candidate_labels: ["offensive", "non-offensive"] 
-            }
-        })
-    });    
+    // FIX: First, check if the username is in the popular names list
+    const isInList = await isUsernameInList(username.toLowerCase());
+    if (isInList) {
+        console.log("username is in popular names list and is safe");
+        return false;
+    }
+
+    // If the username is NOT in the list, proceed with NSFW detection
+    const response = await fetch(
+        "https://api-inference.huggingface.co/models/facebook/bart-large-mnli",
+        {
+            method: "POST",
+            headers: {
+                Authorization: `Bearer ${apiToken}`,
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                inputs: username,
+                parameters: {
+                    candidate_labels: ["offensive", "non-offensive"],
+                },
+            }),
+        }
+    );
 
     const data = await response.json();
+    console.log(data);
 
-    // ako mahan console log, ne iska da raboti prostotiqta tui che go ostavqm
-    console.log(data)
-    
-    if (data.labels[0] == "non-offensive") {
-        return false;
-    } else if (!isUsernameInList(username.toLowerCase())) {
-        return true;
+    if (!data || !data.labels || data.labels.length === 0) {
+        console.error("Unexpected API response format", data);
+        return true; // Assume NSFW if API fails
     }
-}
 
-const isUsernameInList = async (username: string) => {
+    console.log(data.labels[0]);
 
+    if (data.labels[0] === "non-offensive") {
+        console.log("username is not nsfw");
+        return false;
+    }
+
+    console.log("username is nsfw");
+    return true;
+};
+
+const isUsernameInList = (username: string) => {
     const popularNames = new Set([
-        "Liam", "Olivia", "Noah", "Emma", "Oliver", "Ava", "Elijah", "Charlotte", "James", "Sophia",
-        "William", "Amelia", "Benjamin", "Isabella", "Lucas", "Mia", "Henry", "Evelyn", "Alexander", "Harper",
-        "Mason", "Luna", "Michael", "Camila", "Ethan", "Gianna", "Daniel", "Abigail", "Jacob", "Ella",
-        "Logan", "Elizabeth", "Jackson", "Sofia", "Sebastian", "Avery", "Jack", "Scarlett", "Aiden", "Emily",
-        "Owen", "Aria", "Samuel", "Penelope", "Matthew", "Chloe", "Joseph", "Layla", "Levi", "Mila",
-        "Mateo", "Nora", "David", "Hazel", "John", "Madison", "Wyatt", "Ellie", "Carter", "Lily",
-        "Julian", "Nova", "Luke", "Isla", "Grayson", "Grace", "Isaac", "Violet", "Jayden", "Aurora",
-        "Theodore", "Riley", "Gabriel", "Zoey", "Anthony", "Willow", "Dylan", "Emilia", "Leo", "Stella",
-        "Lincoln", "Zoe", "Jaxon", "Victoria", "Asher", "Hannah", "Christopher", "Addison", "Josiah", "Leah",
-        "Andrew", "Lucy", "Thomas", "Eliana", "Joshua", "Ivy", "Ezra", "Everly", "Adrian", "Alex", "Jordan"
+        "liam", "olivia", "noah", "emma", "oliver", "ava", "elijah", "charlotte", "james", "sophia",
+        "william", "amelia", "benjamin", "isabella", "lucas", "mia", "henry", "evelyn", "alexander", "harper",
+        "mason", "luna", "michael", "camila", "ethan", "gianna", "daniel", "abigail", "jacob", "ella",
+        "logan", "elizabeth", "jackson", "sofia", "sebastian", "avery", "jack", "scarlett", "aiden", "emily",
+        "owen", "aria", "samuel", "penelope", "matthew", "chloe", "joseph", "layla", "levi", "mila",
+        "mateo", "nora", "david", "hazel", "john", "madison", "wyatt", "ellie", "carter", "lily",
+        "julian", "nova", "luke", "isla", "grayson", "grace", "isaac", "violet", "jayden", "aurora",
+        "theodore", "riley", "gabriel", "zoey", "anthony", "willow", "dylan", "emilia", "leo", "stella",
+        "lincoln", "zoe", "jaxon", "victoria", "asher", "hannah", "christopher", "addison", "josiah", "leah",
+        "andrew", "lucy", "thomas", "eliana", "joshua", "ivy", "ezra", "everly", "adrian", "alex", "jordan",
     ]);
 
-    return popularNames.has(username);
-}
+    return Promise.resolve(popularNames.has(username));
+};
 
 export default checkUsernameNSFW;
